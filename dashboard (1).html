@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>생산성 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2333;
+  --border:#30363d; --text:#e6edf3; --sub:#8b949e;
+  --blue:#58a6ff; --green:#3fb950; --yellow:#d29922;
+  --red:#f85149; --cyan:#39c5cf; --purple:#bc8cff; --orange:#ff8c42;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:14px;}
+
+.hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:13px 24px;background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:200;}
+.hdr-title{font-size:15px;font-weight:700;color:var(--blue);}
+.hdr-r{display:flex;align-items:center;gap:14px;}
+.upd{font-size:12px;color:var(--sub);}
+.btn-ref{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:5px 13px;border-radius:6px;cursor:pointer;font-size:12px;transition:.2s;}
+.btn-ref:hover{background:var(--border);}
+
+.tab-bar{display:flex;padding:0 24px;background:var(--surface);
+  border-bottom:1px solid var(--border);overflow-x:auto;}
+.tab-btn{padding:10px 18px;background:none;border:none;color:var(--sub);
+  cursor:pointer;font-size:13px;border-bottom:2px solid transparent;
+  transition:.2s;white-space:nowrap;}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);}
+.tab-btn:hover:not(.active){color:var(--text);}
+
+.content{padding:18px 24px;}
+.panel{display:none;} .panel.active{display:block;}
+
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:15px;border-top:2px solid transparent;}
+.kpi.blue{border-top-color:var(--blue);}.kpi.yellow{border-top-color:var(--yellow);}
+.kpi.cyan{border-top-color:var(--cyan);}.kpi.green{border-top-color:var(--green);}
+.kpi.purple{border-top-color:var(--purple);}
+.kpi-lbl{font-size:11px;color:var(--sub);margin-bottom:7px;}
+.kpi-val{font-size:26px;font-weight:700;}
+.kpi.blue .kpi-val{color:var(--blue);}.kpi.yellow .kpi-val{color:var(--yellow);}
+.kpi.cyan .kpi-val{color:var(--cyan);}.kpi.green .kpi-val{color:var(--green);}
+.kpi.purple .kpi-val{color:var(--purple);}
+
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  margin-bottom:16px;overflow:hidden;}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
+.sec-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;}
+.sec-body{padding:16px;}
+
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;color:var(--sub);font-weight:600;
+  padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+.bold{font-weight:700;}.num{text-align:right;font-variant-numeric:tabular-nums;}
+.loading{color:var(--sub);font-size:13px;padding:14px;text-align:center;}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.bw{background:rgba(210,153,34,.15);color:var(--yellow);}
+.bd{background:rgba(63,185,80,.15);color:var(--green);}
+.bc{background:rgba(88,166,255,.15);color:var(--blue);}
+
+.tgl{display:flex;}
+.tgl-btn{padding:4px 13px;border:1px solid var(--border);background:none;
+  color:var(--sub);font-size:12px;cursor:pointer;transition:.2s;}
+.tgl-btn:first-child{border-radius:6px 0 0 6px;}
+.tgl-btn:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.tgl-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+.frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+select{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:4px 9px;border-radius:6px;font-size:12px;cursor:pointer;}
+
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+.cgrid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px;}
+.cbox{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.ctitle{font-size:12px;color:var(--sub);margin-bottom:10px;font-weight:600;}
+.cwrap{position:relative;height:220px;}
+
+.g{color:var(--green);font-weight:700;}
+.y{color:var(--yellow);font-weight:700;}
+.r{color:var(--red);font-weight:700;}
+
+.tag-h{display:inline-block;background:rgba(255,140,66,.15);color:var(--orange);
+  font-size:10px;padding:1px 6px;border-radius:10px;margin-left:3px;}
+.tag-r{display:inline-block;background:rgba(88,166,255,.12);color:var(--blue);
+  font-size:10px;padding:1px 6px;border-radius:10px;margin-left:3px;}
+
+@media(max-width:1100px){.cgrid-3{grid-template-columns:1fr 1fr;}}
+@media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr);}.cgrid,.cgrid-3{grid-template-columns:1fr;}}
+@media(max-width:600px){.kpi-row{grid-template-columns:repeat(2,1fr);}.content{padding:10px;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">📊 생산성 대시보드</div>
+  <div class="hdr-r">
+    <span class="upd" id="upd">로딩 중...</span>
+    <button class="btn-ref" onclick="loadAll()">↺ 새로고침</button>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="sw('today',this)">오늘 현황</button>
+  <button class="tab-btn" onclick="sw('prod',this)">업무별 생산성</button>
+  <button class="tab-btn" onclick="sw('manpower',this)">인원 투입</button>
+  <button class="tab-btn" onclick="sw('person',this)">담당자별 집계</button>
+  <button class="tab-btn" onclick="sw('task',this)">업무별 집계</button>
+</div>
+
+<div class="content">
+
+<!-- ══ 오늘 현황 ══ -->
+<div class="panel active" id="tab-today">
+  <div class="kpi-row">
+    <div class="kpi blue"><div class="kpi-lbl">오늘 업무</div><div class="kpi-val" id="k-tot">-</div></div>
+    <div class="kpi yellow"><div class="kpi-lbl">대기</div><div class="kpi-val" id="k-wait">-</div></div>
+    <div class="kpi cyan"><div class="kpi-lbl">진행</div><div class="kpi-val" id="k-do">-</div></div>
+    <div class="kpi green"><div class="kpi-lbl">완료</div><div class="kpi-val" id="k-done">-</div></div>
+    <div class="kpi purple"><div class="kpi-lbl">물량</div><div class="kpi-val" id="k-qty">-</div></div>
+  </div>
+  <div class="sec">
+    <div class="sec-hdr"><div class="sec-title"><span class="dot"></span>인원별 상태</div></div>
+    <div class="sec-body"><div class="tw">
+      <table><thead><tr><th>이름</th><th>업무 현황</th><th>상세 내용</th><th>상태</th></tr></thead>
+      <tbody id="today-tb"><tr><td colspan="4" class="loading">로딩 중...</td></tr></tbody></table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ 업무별 생산성 (신규 탭) ══ -->
+<div class="panel" id="tab-prod">
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title"><span class="dot" style="background:var(--cyan)"></span>업무 카테고리별 생산성</div>
+      <div class="frow">
+        <div class="tgl">
+          <button class="tgl-btn active" id="pr-mb" onclick="setPrMode('month')">월별</button>
+          <button class="tgl-btn" id="pr-yb" onclick="setPrMode('year')">연별</button>
+        </div>
+        <select id="pr-sel" onchange="renderProd()"><option value="all">전체</option></select>
+      </div>
+    </div>
+    <div class="sec-body"><div class="tw">
+      <table>
+        <thead><tr>
+          <th>업무 카테고리</th>
+          <th style="text-align:right">투입 인원</th>
+          <th style="text-align:right">완료 물량</th>
+          <th style="text-align:right">투입 시간(h)</th>
+          <th style="text-align:right">인당 생산성</th>
+          <th style="text-align:right">UPH (물량/h)</th>
+          <th style="text-align:right">완료 건수</th>
+        </tr></thead>
+        <tbody id="prod-tb"><tr><td colspan="7" class="loading">로딩 중...</td></tr></tbody>
+      </table>
+    </div></div>
+  </div>
+
+  <!-- 차트 3종 -->
+  <div class="cgrid-3">
+    <div class="cbox">
+      <div class="ctitle">👤 인당 생산성 (카테고리별)</div>
+      <div class="cwrap"><canvas id="c-perP"></canvas></div>
+    </div>
+    <div class="cbox">
+      <div class="ctitle">⚡ UPH — 시간당 생산성 (카테고리별)</div>
+      <div class="cwrap"><canvas id="c-uph"></canvas></div>
+    </div>
+    <div class="cbox">
+      <div class="ctitle">📅 월별 투입 인원 (카테고리별)</div>
+      <div class="cwrap"><canvas id="c-catM"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 카테고리 × 월별 투입인원 테이블 -->
+  <div class="sec" style="margin-top:14px;">
+    <div class="sec-hdr">
+      <div class="sec-title"><span class="dot" style="background:var(--purple)"></span>카테고리 × 기간별 투입 인원</div>
+      <div class="tgl">
+        <button class="tgl-btn active" id="cm-mb" onclick="setCmMode('month')">월별</button>
+        <button class="tgl-btn" id="cm-yb" onclick="setCmMode('year')">연별</button>
+      </div>
+    </div>
+    <div class="sec-body"><div class="tw">
+      <table><thead id="cm-head"></thead><tbody id="cm-body"></tbody></table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ 인원 투입 (신규 탭) ══ -->
+<div class="panel" id="tab-manpower">
+  <div class="cgrid">
+    <div class="cbox">
+      <div class="ctitle">👤 월별 투입 인원 수 (정규 vs 헬퍼)</div>
+      <div class="cwrap"><canvas id="c-mpCnt"></canvas></div>
+    </div>
+    <div class="cbox">
+      <div class="ctitle">⏱ 월별 투입 시간 (정규 vs 헬퍼)</div>
+      <div class="cwrap"><canvas id="c-mpHrs"></canvas></div>
+    </div>
+  </div>
+  <div class="sec" style="margin-top:14px;">
+    <div class="sec-hdr"><div class="sec-title"><span class="dot" style="background:var(--orange)"></span>월별 인원 투입 상세</div></div>
+    <div class="sec-body"><div class="tw">
+      <table>
+        <thead><tr>
+          <th>월</th>
+          <th style="text-align:right">정규 인원</th><th style="text-align:right">정규 시간(h)</th>
+          <th style="text-align:right">헬퍼 인원</th><th style="text-align:right">헬퍼 시간(h)</th>
+          <th style="text-align:right">총 인원</th><th style="text-align:right">총 시간(h)</th>
+        </tr></thead>
+        <tbody id="mp-tb"><tr><td colspan="7" class="loading">로딩 중...</td></tr></tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══ 담당자별 집계 ══ -->
+<div class="panel" id="tab-person">
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title"><span class="dot"></span>담당자 × 업무 집계</div>
+      <div class="frow">
+        <div class="tgl">
+          <button class="tgl-btn active" id="pe-mb" onclick="setPeMode('month')">월별</button>
+          <button class="tgl-btn" id="pe-yb" onclick="setPeMode('year')">연별</button>
+        </div>
+        <select id="pe-sel" onchange="renderPerson()"><option value="all">전체</option></select>
+      </div>
+    </div>
+    <div class="sec-body"><div class="tw">
+      <table>
+        <thead><tr>
+          <th>성명</th><th>주요업무</th>
+          <th style="text-align:right">완료 물량</th><th style="text-align:right">투입 시간(h)</th>
+          <th style="text-align:right">UPH</th><th style="text-align:right">완료 건수</th>
+          <th style="text-align:right">인건비</th><th style="text-align:right">단위당 비용</th>
+        </tr></thead>
+        <tbody id="pe-tb"><tr><td colspan="8" class="loading">로딩 중...</td></tr></tbody>
+      </table>
+    </div></div>
+  </div>
+  <div class="cgrid">
+    <div class="cbox"><div class="ctitle">완료 물량 (담당자별)</div><div class="cwrap"><canvas id="c-peQty"></canvas></div></div>
+    <div class="cbox"><div class="ctitle">투입 시간 (담당자별)</div><div class="cwrap"><canvas id="c-peHrs"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══ 업무별 집계 ══ -->
+<div class="panel" id="tab-task">
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title"><span class="dot"></span>업무별 집계</div>
+      <div class="frow">
+        <div class="tgl">
+          <button class="tgl-btn active" id="tk-mb" onclick="setTkMode('month')">월별</button>
+          <button class="tgl-btn" id="tk-yb" onclick="setTkMode('year')">연별</button>
+        </div>
+        <select id="tk-sel" onchange="renderTask()"><option value="all">전체</option></select>
+      </div>
+    </div>
+    <div class="sec-body"><div class="tw">
+      <table>
+        <thead><tr>
+          <th>주요업무</th>
+          <th style="text-align:right">완료 건수</th><th style="text-align:right">참여 인원</th>
+          <th style="text-align:right">총 완료 물량</th><th style="text-align:right">총 투입 시간(h)</th>
+          <th style="text-align:right">평균 UPH</th><th style="text-align:right">총 인건비</th>
+          <th style="text-align:right">단위당 비용</th>
+        </tr></thead>
+        <tbody id="tk-tb"><tr><td colspan="8" class="loading">로딩 중...</td></tr></tbody>
+      </table>
+    </div></div>
+  </div>
+  <div class="cgrid">
+    <div class="cbox"><div class="ctitle">총 완료 물량 (업무별)</div><div class="cwrap"><canvas id="c-tkQty"></canvas></div></div>
+    <div class="cbox"><div class="ctitle">평균 UPH (업무별)</div><div class="cwrap"><canvas id="c-tkUph"></canvas></div></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ────────────────────────────────────
+// 0. 설정
+// ────────────────────────────────────
+const SH1='1HuVF0bUcgVsrgnyP7TMniVS4PGBz9D9ewpBsbjyQRBE';
+const SH2='1P205pz9PWx5k59NgXcnMwUVy8MTGW4v33rjOOy12DbI';
+const csv=(id,gid)=>`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}&t=${Date.now()}`;
+
+// ── 업무번호 → 카테고리 매핑 (시트 업무번호 탭 기준) ──
+const CAT={
+  '반품1':'반품','반품2':'반품','반품3':'반품','반품4':'반품','반품5':'반품',
+  '선작업1':'선작업','선작업2':'선작업','선작업3':'선작업','선작업4':'선작업',
+  '출고1':'출고','출고2':'출고','출고3':'출고',
+  '수출1':'수출',
+  '입고1':'입고','입고2':'입고','입고3':'입고',
+  '청소':'청소'
+};
+const CAT_ORDER=['반품','선작업','입고','출고','수출','청소'];
+const CAT_CLR={
+  '반품':'#58a6ff','선작업':'#3fb950','입고':'#39c5cf',
+  '출고':'#bc8cff','수출':'#ff8c42','청소':'#d29922'
+};
+
+// 헬퍼 판별: 이름에 '헬퍼' 포함 (헬퍼1/헬퍼2/헬퍼3)
+const isHlp=n=>(n||'').includes('헬퍼');
+
+// ────────────────────────────────────
+// 1. 전역 상태
+// ────────────────────────────────────
+let G={rows:[],labor:[],prMode:'month',peMode:'month',tkMode:'month',cmMode:'month'};
+let CH={};
+
+// ────────────────────────────────────
+// 2. 유틸
+// ────────────────────────────────────
+const pad=n=>String(n).padStart(2,'0');
+function todayStr(){
+  const d=new Date();
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+}
+
+// r[0]=업무ID(yy.MM.dd-번호), r[1]=업무명(번호코드), r[2]=상세내용,
+// r[3]=담당자, r[4]=상태, r[7]=수량, r[9]=누적작업시간
+function parseDate(r){
+  const m=(r[0]||'').match(/^(\d{2})\.(\d{2})\.(\d{2})/);
+  if(!m) return null;
+  return {year:'20'+m[1], month:'20'+m[1]+'-'+m[2]};
+}
+function getCat(r){ return CAT[r[1]] || r[2] || '기타'; }
+
+async function fetchCsv(url){
+  const res=await fetch(url);
+  if(!res.ok) throw new Error(res.status);
+  return parseCsv(await res.text());
+}
+function parseCsv(text){
+  return text.split('\n').slice(1).map(line=>{
+    const cols=[];let cur='',inQ=false;
+    for(const c of line){
+      if(c==='"'){inQ=!inQ;continue;}
+      if(c===','&&!inQ){cols.push(cur.trim());cur='';continue;}
+      cur+=c;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }).filter(r=>r.some(c=>c!==''));
+}
+
+function filterRows(mode,period){
+  if(period==='all') return G.rows;
+  return G.rows.filter(r=>{
+    const d=parseDate(r);if(!d) return false;
+    return mode==='month'?d.month===period:d.year===period;
+  });
+}
+function rebuildSel(id,mode){
+  const ms=new Set(),ys=new Set();
+  G.rows.forEach(r=>{const d=parseDate(r);if(d){ms.add(d.month);ys.add(d.year);}});
+  const arr=[...(mode==='month'?ms:ys)].sort().reverse();
+  const el=document.getElementById(id);
+  el.innerHTML='<option value="all">전체</option>';
+  arr.forEach(v=>el.innerHTML+=`<option value="${v}">${v}</option>`);
+}
+function uphCls(v){return v>=50?'g':v>=20?'y':'r';}
+
+// ────────────────────────────────────
+// 3. 로드
+// ────────────────────────────────────
+async function loadAll(){
+  document.getElementById('upd').textContent='로딩 중...';
+  try{
+    const [r1,r2,lab]=await Promise.all([
+      fetchCsv(csv(SH1,'1272922114')),
+      fetchCsv(csv(SH2,'1908325385')),
+      fetchCsv(csv(SH2,'1928958544')).catch(()=>[])
+    ]);
+    G.rows=[...r1,...r2];
+    G.labor=lab;
+    rebuildSel('pr-sel',G.prMode);
+    rebuildSel('pe-sel',G.peMode);
+    rebuildSel('tk-sel',G.tkMode);
+    renderToday();
+    renderProd();
+    renderManpower();
+    renderPerson();
+    renderTask();
+    const n=new Date();
+    document.getElementById('upd').textContent=
+      `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())} ${pad(n.getHours())}:${pad(n.getMinutes())} 갱신`;
+  }catch(e){
+    document.getElementById('upd').textContent='로드 실패 — 시트 공개 게시 확인 필요';
+    console.error(e);
+  }
+}
+
+// ────────────────────────────────────
+// 4. 오늘 현황
+// ────────────────────────────────────
+function renderToday(){
+  const t=todayStr();
+  const rows=G.rows.filter(r=>(r[0]||'').startsWith(t));
+  document.getElementById('k-tot').textContent=rows.length+'건';
+  document.getElementById('k-wait').textContent=rows.filter(r=>r[4]==='대기').length+'건';
+  document.getElementById('k-do').textContent=rows.filter(r=>r[4]==='진행중').length+'건';
+  document.getElementById('k-done').textContent=rows.filter(r=>r[4]==='완료').length+'건';
+  document.getElementById('k-qty').textContent=rows.reduce((s,r)=>s+(parseFloat(r[7])||0),0).toLocaleString()+'개';
+
+  const pm={};
+  rows.forEach(r=>{const n=r[3];if(!n)return;if(!pm[n]||r[4]==='진행중')pm[n]=r;});
+  const tb=document.getElementById('today-tb');
+  const ents=Object.values(pm);
+  if(!ents.length){tb.innerHTML='<tr><td colspan="4" class="loading">오늘 데이터 없음</td></tr>';return;}
+  tb.innerHTML=ents.map(r=>{
+    const s=r[4]||'';
+    const badge=s==='대기'?'<span class="badge bw">● 대기</span>':
+                 s==='진행중'?'<span class="badge bd">● 진행</span>':
+                 s==='완료'?'<span class="badge bc">● 완료</span>':s;
+    return `<tr><td class="bold">${r[3]}</td><td>${r[2]||'-'}</td><td>${r[2]||'-'}</td><td>${badge}</td></tr>`;
+  }).join('');
+}
+
+// ────────────────────────────────────
+// 5. 업무별 생산성
+// ────────────────────────────────────
+function setPrMode(m){
+  G.prMode=m;
+  document.getElementById('pr-mb').classList.toggle('active',m==='month');
+  document.getElementById('pr-yb').classList.toggle('active',m==='year');
+  rebuildSel('pr-sel',m);
+  renderProd();
+}
+
+function renderProd(){
+  const period=document.getElementById('pr-sel').value;
+  const rows=filterRows(G.prMode,period);
+
+  // 카테고리 집계
+  const map={};
+  rows.forEach(r=>{
+    const cat=getCat(r);const name=r[3];
+    if(!map[cat])map[cat]={persons:new Set(),qty:0,hrs:0,cnt:0};
+    if(name)map[cat].persons.add(name);
+    map[cat].qty+=parseFloat(r[7])||0;
+    map[cat].hrs+=parseFloat(r[9])||0;
+    if(r[4]==='완료')map[cat].cnt++;
+  });
+
+  const cats=CAT_ORDER.filter(c=>map[c]).concat(Object.keys(map).filter(c=>!CAT_ORDER.includes(c)));
+
+  const tb=document.getElementById('prod-tb');
+  if(!cats.length){tb.innerHTML='<tr><td colspan="7" class="loading">해당 기간 데이터 없음</td></tr>';return;}
+
+  tb.innerHTML=cats.map(cat=>{
+    const d=map[cat];
+    const uph=d.hrs>0?(d.qty/d.hrs).toFixed(1):'-';
+    const perP=d.persons.size>0?(d.qty/d.persons.size).toFixed(0):'-';
+    const uc=uph!=='-'?uphCls(parseFloat(uph)):'';
+    return `<tr>
+      <td class="bold" style="color:${CAT_CLR[cat]||'var(--text)'}">● ${cat}</td>
+      <td class="num">${d.persons.size}명</td>
+      <td class="num">${d.qty.toLocaleString()}</td>
+      <td class="num">${d.hrs.toFixed(1)}</td>
+      <td class="num">${perP!=='-'?Number(perP).toLocaleString():'-'}</td>
+      <td class="num ${uc}">${uph}</td>
+      <td class="num">${d.cnt}</td>
+    </tr>`;
+  }).join('');
+
+  // 차트1: 인당 생산성
+  const ppData=cats.map(c=>map[c].persons.size>0?+(map[c].qty/map[c].persons.size).toFixed(0):0);
+  buildBar('c-perP',cats,ppData,'인당 생산성',cats.map(c=>CAT_CLR[c]||'#58a6ff'));
+
+  // 차트2: UPH
+  const uphData=cats.map(c=>map[c].hrs>0?+(map[c].qty/map[c].hrs).toFixed(1):0);
+  buildBar('c-uph',cats,uphData,'UPH',cats.map(c=>CAT_CLR[c]||'#3fb950'));
+
+  // 차트3: 월별 카테고리 투입인원 (누적 묶음 막대)
+  const allM=[...new Set(G.rows.map(r=>{const d=parseDate(r);return d?d.month:null}).filter(Boolean))].sort();
+  const catMMap={};
+  G.rows.forEach(r=>{
+    const d=parseDate(r);if(!d)return;
+    const cat=getCat(r);const name=r[3];if(!name)return;
+    if(!catMMap[cat])catMMap[cat]={};
+    if(!catMMap[cat][d.month])catMMap[cat][d.month]=new Set();
+    catMMap[cat][d.month].add(name);
+  });
+  const datasets=cats.map(cat=>({
+    label:cat,
+    data:allM.map(m=>catMMap[cat]&&catMMap[cat][m]?catMMap[cat][m].size:0),
+    backgroundColor:(CAT_CLR[cat]||'#58a6ff')+'99',
+    borderColor:CAT_CLR[cat]||'#58a6ff',
+    borderWidth:1,borderRadius:3
+  }));
+  buildGroupedBar('c-catM',allM,datasets,'투입 인원(명)');
+
+  // 카테고리 × 기간 테이블
+  renderCatMonthTable();
+}
+
+// ────────────────────────────────────
+// 6. 카테고리 × 기간 테이블
+// ────────────────────────────────────
+function setCmMode(m){
+  G.cmMode=m;
+  document.getElementById('cm-mb').classList.toggle('active',m==='month');
+  document.getElementById('cm-yb').classList.toggle('active',m==='year');
+  renderCatMonthTable();
+}
+function renderCatMonthTable(){
+  const mode=G.cmMode;
+  const perSet=new Set();
+  G.rows.forEach(r=>{const d=parseDate(r);if(d)perSet.add(mode==='month'?d.month:d.year);});
+  const periods=[...perSet].sort().reverse();
+
+  const cpm={};
+  G.rows.forEach(r=>{
+    const d=parseDate(r);if(!d)return;
+    const p=mode==='month'?d.month:d.year;
+    const cat=getCat(r);const name=r[3];if(!name)return;
+    if(!cpm[cat])cpm[cat]={};
+    if(!cpm[cat][p])cpm[cat][p]=new Set();
+    cpm[cat][p].add(name);
+  });
+  const cats=CAT_ORDER.filter(c=>cpm[c]).concat(Object.keys(cpm).filter(c=>!CAT_ORDER.includes(c)));
+
+  document.getElementById('cm-head').innerHTML=
+    '<tr><th>카테고리</th>'+periods.map(p=>`<th style="text-align:right">${p}</th>`).join('')+'</tr>';
+  document.getElementById('cm-body').innerHTML=cats.map(cat=>{
+    const cells=periods.map(p=>{
+      const cnt=cpm[cat]&&cpm[cat][p]?cpm[cat][p].size:0;
+      return `<td class="num">${cnt>0?cnt+'명':'-'}</td>`;
+    }).join('');
+    return `<tr><td class="bold" style="color:${CAT_CLR[cat]||'var(--text)'}">● ${cat}</td>${cells}</tr>`;
+  }).join('');
+}
+
+// ────────────────────────────────────
+// 7. 인원 투입
+// ────────────────────────────────────
+function renderManpower(){
+  const mmap={};
+  G.rows.forEach(r=>{
+    const d=parseDate(r);if(!d)return;
+    const m=d.month;const name=r[3];const hrs=parseFloat(r[9])||0;if(!name)return;
+    if(!mmap[m])mmap[m]={reg:new Set(),hlp:new Set(),rh:0,hh:0};
+    if(isHlp(name)){mmap[m].hlp.add(name);mmap[m].hh+=hrs;}
+    else{mmap[m].reg.add(name);mmap[m].rh+=hrs;}
+  });
+  const months=Object.keys(mmap).sort();
+  buildGroupedBar('c-mpCnt',months,[
+    {label:'정규',data:months.map(m=>mmap[m].reg.size),backgroundColor:'#58a6ff99',borderColor:'#58a6ff',borderWidth:1,borderRadius:3},
+    {label:'헬퍼',data:months.map(m=>mmap[m].hlp.size),backgroundColor:'#ff8c4299',borderColor:'#ff8c42',borderWidth:1,borderRadius:3}
+  ],'인원(명)');
+  buildGroupedBar('c-mpHrs',months,[
+    {label:'정규',data:months.map(m=>+mmap[m].rh.toFixed(1)),backgroundColor:'#3fb95099',borderColor:'#3fb950',borderWidth:1,borderRadius:3},
+    {label:'헬퍼',data:months.map(m=>+mmap[m].hh.toFixed(1)),backgroundColor:'#d2992299',borderColor:'#d29922',borderWidth:1,borderRadius:3}
+  ],'시간(h)');
+
+  const tb=document.getElementById('mp-tb');
+  if(!months.length){tb.innerHTML='<tr><td colspan="7" class="loading">데이터 없음</td></tr>';return;}
+  tb.innerHTML=[...months].reverse().map(m=>{
+    const d=mmap[m];
+    return `<tr>
+      <td class="bold">${m}</td>
+      <td class="num">${d.reg.size}명 <span class="tag-r">정규</span></td>
+      <td class="num">${d.rh.toFixed(1)}</td>
+      <td class="num">${d.hlp.size}명 <span class="tag-h">헬퍼</span></td>
+      <td class="num">${d.hh.toFixed(1)}</td>
+      <td class="num bold">${d.reg.size+d.hlp.size}명</td>
+      <td class="num bold">${(d.rh+d.hh).toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ────────────────────────────────────
+// 8. 담당자별 집계
+// ────────────────────────────────────
+function setPeMode(m){
+  G.peMode=m;
+  document.getElementById('pe-mb').classList.toggle('active',m==='month');
+  document.getElementById('pe-yb').classList.toggle('active',m==='year');
+  rebuildSel('pe-sel',m);
+  renderPerson();
+}
+function renderPerson(){
+  const period=document.getElementById('pe-sel').value;
+  const rows=filterRows(G.peMode,period);
+  const map={};
+  rows.forEach(r=>{
+    const name=r[3];const task=r[2]||'미분류';if(!name)return;
+    const key=name+'||'+task;
+    if(!map[key])map[key]={name,task,qty:0,hrs:0,cnt:0};
+    map[key].qty+=parseFloat(r[7])||0;
+    map[key].hrs+=parseFloat(r[9])||0;
+    if(r[4]==='완료')map[key].cnt++;
+  });
+  const lm={};
+  G.labor.forEach(r=>{const n=r[1];if(!n)return;lm[n]=(lm[n]||0)+(parseFloat(r[3])||0);});
+  const tb=document.getElementById('pe-tb');
+  const ents=Object.values(map).sort((a,b)=>b.qty-a.qty);
+  if(!ents.length){tb.innerHTML='<tr><td colspan="8" class="loading">해당 기간 데이터 없음</td></tr>';}
+  else{
+    tb.innerHTML=ents.map(d=>{
+      const uph=d.hrs>0?(d.qty/d.hrs).toFixed(1):'-';
+      const lab=lm[d.name]||0;
+      const uc=d.qty>0&&lab>0?(lab/d.qty).toFixed(0):'-';
+      const tag=isHlp(d.name)?'<span class="tag-h">헬퍼</span>':'<span class="tag-r">정규</span>';
+      return `<tr>
+        <td class="bold">${d.name}${tag}</td>
+        <td>${d.task}</td>
+        <td class="num">${d.qty.toLocaleString()}</td>
+        <td class="num">${d.hrs.toFixed(1)}</td>
+        <td class="num ${uph!=='-'?uphCls(parseFloat(uph)):''}">${uph}</td>
+        <td class="num">${d.cnt}</td>
+        <td class="num">${lab?lab.toLocaleString()+'원':'-'}</td>
+        <td class="num">${uc!=='-'?uc+'원':'-'}</td>
+      </tr>`;
+    }).join('');
+  }
+  const names=[...new Set(ents.map(d=>d.name))];
+  buildBar('c-peQty',names,names.map(n=>ents.filter(d=>d.name===n).reduce((s,d)=>s+d.qty,0)),
+    '완료 물량',names.map(n=>isHlp(n)?'#ff8c42':'#58a6ff'));
+  buildBar('c-peHrs',names,names.map(n=>ents.filter(d=>d.name===n).reduce((s,d)=>s+d.hrs,0)),
+    '투입 시간',names.map(n=>isHlp(n)?'#d29922':'#3fb950'));
+}
+
+// ────────────────────────────────────
+// 9. 업무별 집계
+// ────────────────────────────────────
+function setTkMode(m){
+  G.tkMode=m;
+  document.getElementById('tk-mb').classList.toggle('active',m==='month');
+  document.getElementById('tk-yb').classList.toggle('active',m==='year');
+  rebuildSel('tk-sel',m);
+  renderTask();
+}
+function renderTask(){
+  const period=document.getElementById('tk-sel').value;
+  const rows=filterRows(G.tkMode,period);
+  const map={};
+  rows.forEach(r=>{
+    const task=r[2]||'미분류';const name=r[3];
+    if(!map[task])map[task]={cnt:0,persons:new Set(),qty:0,hrs:0};
+    if(name)map[task].persons.add(name);
+    map[task].qty+=parseFloat(r[7])||0;
+    map[task].hrs+=parseFloat(r[9])||0;
+    if(r[4]==='완료')map[task].cnt++;
+  });
+  const lm={};
+  G.labor.forEach(r=>{const t=r[2];if(!t)return;lm[t]=(lm[t]||0)+(parseFloat(r[3])||0);});
+  const tb=document.getElementById('tk-tb');
+  const ents=Object.entries(map).sort((a,b)=>b[1].qty-a[1].qty);
+  if(!ents.length){tb.innerHTML='<tr><td colspan="8" class="loading">해당 기간 데이터 없음</td></tr>';}
+  else{
+    tb.innerHTML=ents.map(([t,d])=>{
+      const uph=d.hrs>0?(d.qty/d.hrs).toFixed(1):'-';
+      const lab=lm[t]||0;const uc=d.qty>0&&lab>0?(lab/d.qty).toFixed(0):'-';
+      return `<tr>
+        <td class="bold">${t}</td>
+        <td class="num">${d.cnt}</td><td class="num">${d.persons.size}명</td>
+        <td class="num">${d.qty.toLocaleString()}</td><td class="num">${d.hrs.toFixed(1)}</td>
+        <td class="num ${uph!=='-'?uphCls(parseFloat(uph)):''}">${uph}</td>
+        <td class="num">${lab?lab.toLocaleString()+'원':'-'}</td>
+        <td class="num">${uc!=='-'?uc+'원':'-'}</td>
+      </tr>`;
+    }).join('');
+  }
+  buildBar('c-tkQty',ents.map(([t])=>t),ents.map(([,d])=>d.qty),'총 완료 물량','#bc8cff');
+  buildBar('c-tkUph',ents.map(([t])=>t),ents.map(([,d])=>d.hrs>0?+(d.qty/d.hrs).toFixed(1):0),'평균 UPH','#39c5cf');
+}
+
+// ────────────────────────────────────
+// 10. 차트 빌더
+// ────────────────────────────────────
+const BOPTS={
+  responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},
+    tooltip:{backgroundColor:'#1c2333',titleColor:'#e6edf3',bodyColor:'#8b949e'}},
+  scales:{
+    x:{ticks:{color:'#8b949e',font:{size:11}},grid:{color:'#30363d'}},
+    y:{ticks:{color:'#8b949e',font:{size:11}},grid:{color:'#30363d'}}
+  }
+};
+
+function buildBar(id,labels,data,label,colors){
+  if(CH[id])CH[id].destroy();
+  const ctx=document.getElementById(id).getContext('2d');
+  const isArr=Array.isArray(colors);
+  CH[id]=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{
+      label,data,
+      backgroundColor:isArr?colors.map(c=>c+'99'):colors+'99',
+      borderColor:isArr?colors:colors,
+      borderWidth:1,borderRadius:4
+    }]},
+    options:{...BOPTS,
+      plugins:{...BOPTS.plugins,legend:{display:true,labels:{color:'#8b949e',font:{size:11}}}}}
+  });
+}
+
+function buildGroupedBar(id,labels,datasets,yLabel){
+  if(CH[id])CH[id].destroy();
+  const ctx=document.getElementById(id).getContext('2d');
+  CH[id]=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets},
+    options:{...BOPTS,
+      plugins:{...BOPTS.plugins,legend:{display:true,labels:{color:'#8b949e',font:{size:11}}}},
+      scales:{...BOPTS.scales,
+        y:{...BOPTS.scales.y,title:{display:true,text:yLabel,color:'#8b949e',font:{size:11}}}}}
+  });
+}
+
+// ────────────────────────────────────
+// 11. 탭 전환
+// ────────────────────────────────────
+function sw(name,el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ────────────────────────────────────
+// 12. 시작
+// ────────────────────────────────────
+loadAll();
+setInterval(loadAll,5*60*1000);
+</script>
+</body>
+</html>
