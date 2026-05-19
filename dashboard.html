@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>생산성 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #21253a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --text2: #8b90a7;
+    --text3: #555a70;
+    --purple: #7c6ff7;
+    --purple2: #9d97f9;
+    --purple-bg: rgba(124,111,247,0.12);
+    --green: #34d399;
+    --green-bg: rgba(52,211,153,0.1);
+    --amber: #fbbf24;
+    --amber-bg: rgba(251,191,36,0.1);
+    --blue: #60a5fa;
+    --blue-bg: rgba(96,165,250,0.1);
+    --red: #f87171;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 220px; background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0; z-index: 100;
+  }
+  .logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-title {
+    font-size: 15px; font-weight: 700;
+    color: var(--text); letter-spacing: -0.3px;
+  }
+  .logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .nav { padding: 12px 10px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--text2); font-size: 13px;
+    font-weight: 500; transition: all 0.15s; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--purple-bg); color: var(--purple2); }
+  .nav-icon { width: 18px; height: 18px; opacity: 0.8; }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); margin-left: auto;
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3);
+  }
+  .refresh-btn {
+    width: 100%; padding: 9px; border-radius: var(--radius-sm);
+    background: var(--purple-bg); border: 1px solid rgba(124,111,247,0.25);
+    color: var(--purple2); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+    margin-bottom: 10px;
+  }
+  .refresh-btn:hover { background: rgba(124,111,247,0.2); }
+  .main { margin-left: 220px; padding: 28px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+  .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .page-title span { color: var(--purple2); }
+  .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill-group { display: flex; border: 1px solid var(--border2); border-radius: var(--radius-sm); overflow: hidden; }
+  .pill {
+    padding: 7px 14px; font-size: 12px; font-weight: 600;
+    cursor: pointer; background: transparent; color: var(--text2);
+    border: none; font-family: inherit; transition: all 0.15s;
+  }
+  .pill.active { background: var(--purple); color: #fff; }
+  .pill:hover:not(.active) { background: var(--bg3); color: var(--text); }
+  select.filter-sel {
+    padding: 7px 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border2); background: var(--bg2);
+    color: var(--text); font-size: 12px; font-family: inherit;
+    cursor: pointer; outline: none;
+  }
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+    position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.purple::before { background: var(--purple); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.amber::before { background: var(--amber); }
+  .kpi-card.blue::before { background: var(--blue); }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; }
+  .kpi-value.purple { color: var(--purple2); }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.amber { color: var(--amber); }
+  .kpi-value.blue { color: var(--blue); }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 700; color: var(--text);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    letter-spacing: -0.2px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--purple);
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width: 768px) { .two-col { grid-template-columns: 1fr; } .sidebar { display: none; } .main { margin-left: 0; } }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tbl th {
+    text-align: left; padding: 8px 10px; font-size: 11px;
+    font-weight: 600; color: var(--text3); text-transform: uppercase;
+    letter-spacing: 0.4px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .tbl th:not(:first-child) { text-align: center; }
+  .tbl td {
+    padding: 9px 10px; border-bottom: 1px solid var(--border);
+    color: var(--text); white-space: nowrap;
+  }
+  .tbl td:not(:first-child) { text-align: center; color: var(--text2); }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: rgba(255,255,255,0.02); }
+  .tbl td:first-child { font-weight: 600; color: var(--text); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.wait { background: var(--amber-bg); color: var(--amber); }
+  .badge.progress { background: var(--green-bg); color: var(--green); }
+  .badge.done { background: var(--blue-bg); color: var(--blue); }
+  .chart-wrap { position: relative; width: 100%; height: 220px; }
+  .empty { text-align: center; padding: 32px; color: var(--text3); font-size: 13px; }
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px; color: var(--text3); font-size: 13px; gap: 8px;
+  }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border2);
+    border-top-color: var(--purple); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .update-time { font-size: 11px; color: var(--text3); }
+  .overflow-x { overflow-x: auto; }
+  .tag {
+    display: inline-block; padding: 2px 7px;
+    border-radius: 4px; font-size: 11px; font-weight: 600;
+    background: var(--purple-bg); color: var(--purple2);
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-title">📊 생산성 대시보드</div>
+    <div class="logo-sub">실시간 업무 현황</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('today')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      오늘 현황
+      <div class="status-dot"></div>
+    </div>
+    <div class="nav-item" onclick="showPage('person')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      담당자별 집계
+    </div>
+    <div class="nav-item" onclick="showPage('task')">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      업무별 집계
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="refresh-btn" onclick="refreshData()">↺ 새로고침</button>
+    <div class="update-time" id="update-time">로딩 중...</div>
+    <div style="margin-top:4px;font-size:10px;color:var(--text3)">5분마다 자동 갱신</div>
+  </div>
+</div>
+
+<main class="main">
+
+  <!-- 오늘 현황 -->
+  <div class="page active" id="page-today">
+    <div class="page-header">
+      <div class="page-title">오늘 <span>현황</span></div>
+      <div id="today-date" style="font-size:13px;color:var(--text2)"></div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card purple"><div class="kpi-label">오늘 업무</div><div class="kpi-value purple" id="k-total">-</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">대기</div><div class="kpi-value amber" id="k-wait">-</div></div>
+      <div class="kpi-card green"><div class="kpi-label">진행</div><div class="kpi-value green" id="k-progress">-</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">완료</div><div class="kpi-value blue" id="k-done">-</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">물량</div><div class="kpi-value purple" id="k-qty">-</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>인원별 상태</div>
+      <div id="status-wrap"><div class="loading"><div class="spinner"></div>데이터 로딩 중...</div></div>
+    </div>
+  </div>
+
+  <!-- 담당자별 -->
+  <div class="page" id="page-person">
+    <div class="page-header">
+      <div class="page-title">담당자별 <span>집계</span></div>
+      <div class="filter-row">
+        <div class="pill-group">
+          <button class="pill active" id="p-monthly" onclick="setPeriod('monthly')">월별</button>
+          <button class="pill" id="p-yearly" onclick="setPeriod('yearly')">연별</button>
+        </div>
+        <select class="filter-sel" id="p-filter" onchange="renderPerson()">
+          <option value="">전체</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>담당자 × 업무 집계</div>
+      <div class="overflow-x" id="person-tbl-wrap"><div class="loading"><div class="spinner"></div>로딩 중...</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>완료 물량 (담당자별)</div>
+        <div class="chart-wrap"><canvas id="c-person-qty" role="img" aria-label="담당자별 완료 물량">로딩 중</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>투입 시간 (담당자별)</div>
+        <div class="chart-wrap"><canvas id="c-person-time" role="img" aria-label="담당자별 투입 시간">로딩 중</canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 업무별 -->
+  <div class="page" id="page-task">
+    <div class="page-header">
+      <div class="page-title">업무별 <span>집계</span></div>
+      <div class="filter-row">
+        <div class="pill-group">
+          <button class="pill active" id="t-monthly" onclick="setPeriodTask('monthly')">월별</button>
+          <button class="pill" id="t-yearly" onclick="setPeriodTask('yearly')">연별</button>
+        </div>
+        <select class="filter-sel" id="t-filter" onchange="renderTask()">
+          <option value="">전체</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>업무별 집계</div>
+      <div class="overflow-x" id="task-tbl-wrap"><div class="loading"><div class="spinner"></div>로딩 중...</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>총 완료 물량 (업무별)</div>
+        <div class="chart-wrap"><canvas id="c-task-qty" role="img" aria-label="업무별 완료 물량">로딩 중</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>평균 UPH (업무별)</div>
+        <div class="chart-wrap"><canvas id="c-task-uph" role="img" aria-label="업무별 평균 UPH">로딩 중</canvas></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const SS1='1HuVF0bUcgVsrgnyP7TMniVS4PGBz9D9ewpBsbjyQRBE';
+const SS2='1P205pz9PWx5k59NgXcnMwUVy8MTGW4v33rjOOy12DbI';
+const GID={work1:'1272922114',staff1:'0',work2:'1908325385',labor2:'1928958544'};
+
+function csvUrl(ss,gid){return `https://docs.google.com/spreadsheets/d/${ss}/export?format=csv&gid=${gid}`;}
+
+async function fetchCSV(ss,gid){
+  const r=await fetch(csvUrl(ss,gid));
+  if(!r.ok)throw new Error('fetch error');
+  return parseCSV(await r.text());
+}
+
+function parseCSV(t){
+  return t.split('\n').map(l=>l.trim()).filter(l=>l).map(line=>{
+    const cols=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      if(line[i]==='"'){inQ=!inQ;}
+      else if(line[i]===','&&!inQ){cols.push(cur.trim());cur='';}
+      else cur+=line[i];
+    }
+    cols.push(cur.trim());return cols;
+  });
+}
+
+let allWork=[],laborMap={};
+let periodPerson='monthly',periodTask='monthly';
+let charts={};
+
+function parseDate(v){
+  if(!v||v==='')return null;
+  const s=String(v).replace('오전','AM').replace('오후','PM');
+  const d=new Date(s);if(!isNaN(d))return d;
+  const m=s.match(/^(\d{2})\.(\d{2})\.(\d{2})/);
+  if(m)return new Date(2000+parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  return null;
+}
+
+function fmt(d,f){
+  if(!d)return'';
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  if(f==='yyyy-MM')return`${y}-${m}`;
+  if(f==='yyyy')return`${y}`;
+  return`${y}-${m}-${dd}`;
+}
+
+function extractDate(row){
+  const f=row[5];if(f){const d=parseDate(f);if(d&&!isNaN(d))return d;}
+  const m=String(row[0]||'').match(/^(\d{2})\.(\d{2})\.(\d{2})/);
+  if(m)return new Date(2000+parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  return null;
+}
+
+function parseTime(row){
+  const j=parseFloat(row[9]);
+  if(!isNaN(j)&&j>0){return j>3600?j/3600:j;}
+  const s=parseDate(row[5]),e=parseDate(row[6]);
+  if(s&&e&&e>s)return(e-s)/3600000;
+  return 0;
+}
+
+function won(v){return v>0?'₩'+Math.round(v).toLocaleString():'-';}
+function uph(q,t){return(q>0&&t>0)?(q/t).toFixed(1)+' 개/h':'-';}
+
+async function loadData(){
+  try{
+    const [w1,w2,lb]=await Promise.all([fetchCSV(SS1,GID.work1),fetchCSV(SS2,GID.work2),fetchCSV(SS2,GID.labor2)]);
+    allWork=[...w1.slice(1),...w2.slice(1)];
+    laborMap={};
+    lb.slice(1).forEach(r=>{const n=String(r[0]||'').trim(),v=parseFloat(r[1]);if(n&&!isNaN(v))laborMap[n]=v;});
+    populateFilters();
+    renderAll();
+    const now=new Date();
+    document.getElementById('update-time').textContent=`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} 업데이트`;
+    document.getElementById('today-date').textContent=fmt(now,'yyyy-MM-dd')+' ('+['일','월','화','수','목','금','토'][now.getDay()]+'요일)';
+  }catch(e){
+    document.getElementById('update-time').textContent='로드 실패 - 시트 공개 설정 확인';
+  }
+}
+
+function refreshData(){document.getElementById('update-time').textContent='갱신 중...';loadData();}
+
+function populateFilters(){
+  ['p-filter','t-filter'].forEach((id,idx)=>{
+    const period=idx===0?periodPerson:periodTask;
+    const sel=document.getElementById(id);
+    const cur=sel.value;
+    const set=new Set();
+    allWork.forEach(row=>{
+      if(!String(row[4]||'').includes('완료'))return;
+      const d=extractDate(row);if(!d)return;
+      set.add(fmt(d,period==='monthly'?'yyyy-MM':'yyyy'));
+    });
+    const opts=[...set].sort().reverse();
+    sel.innerHTML='<option value="">전체</option>'+opts.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('');
+  });
+}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function setPeriod(p){
+  periodPerson=p;
+  document.getElementById('p-monthly').classList.toggle('active',p==='monthly');
+  document.getElementById('p-yearly').classList.toggle('active',p==='yearly');
+  populateFilters();renderPerson();
+}
+function setPeriodTask(p){
+  periodTask=p;
+  document.getElementById('t-monthly').classList.toggle('active',p==='monthly');
+  document.getElementById('t-yearly').classList.toggle('active',p==='yearly');
+  populateFilters();renderTask();
+}
+
+function matchFilter(row,period,filter){
+  if(!filter)return true;
+  const d=extractDate(row);if(!d)return false;
+  return fmt(d,period==='monthly'?'yyyy-MM':'yyyy')===filter;
+}
+
+function renderAll(){renderToday();renderPerson();renderTask();}
+
+function renderToday(){
+  const today=new Date();
+  const todayStr=fmt(today,'yyyy-MM-dd');
+  const todayId=`${String(today.getFullYear()).slice(2)}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+  let total=0,wait=0,progress=0,done=0,qty=0;
+  const pm={};
+  allWork.forEach(row=>{
+    const id=String(row[0]||'');
+    const d=extractDate(row);
+    const isToday=id.startsWith(todayId)||(d&&fmt(d,'yyyy-MM-dd')===todayStr);
+    if(!isToday)return;
+    const st=String(row[4]||'').trim(),name=String(row[3]||'').trim();
+    total++;
+    if(st.includes('대기'))wait++;
+    else if(st.includes('진행'))progress++;
+    else if(st.includes('완료')){done++;qty+=parseInt(row[7])||0;}
+    if(name){
+      if(!pm[name])pm[name]={hasP:false,hasW:false,hasD:false,task:''};
+      if(st.includes('진행')){pm[name].hasP=true;if(!pm[name].task)pm[name].task=String(row[2]||'');}
+      else if(st.includes('완료'))pm[name].hasD=true;
+      else if(st.includes('대기'))pm[name].hasW=true;
+    }
+  });
+  document.getElementById('k-total').textContent=total+'건';
+  document.getElementById('k-wait').textContent=wait+'건';
+  document.getElementById('k-progress').textContent=progress+'건';
+  document.getElementById('k-done').textContent=done+'건';
+  document.getElementById('k-qty').textContent=qty+'개';
+
+  const names=Object.keys(pm).sort((a,b)=>{
+    const ra=pm[a].hasP?0:pm[a].hasW?1:2,rb=pm[b].hasP?0:pm[b].hasW?1:2;
+    return ra-rb||a.localeCompare(b);
+  });
+  if(!names.length){document.getElementById('status-wrap').innerHTML='<div class="empty">오늘 등록된 업무가 없습니다</div>';return;}
+  let h=`<table class="tbl"><thead><tr><th>이름</th><th>업무 현황</th><th>상세 내용</th><th>상태</th></tr></thead><tbody>`;
+  names.forEach(n=>{
+    const p=pm[n];
+    let badge,task,detail;
+    if(p.hasP){badge='<span class="badge progress">● 진행</span>';task=p.task||'진행 중';detail=p.task||'-';}
+    else if(p.hasW){badge='<span class="badge wait">● 대기</span>';task='대기 중';detail='-';}
+    else{badge='<span class="badge done">● 완료</span>';task='업무 완료';detail='-';}
+    h+=`<tr><td>${n}</td><td>${task}</td><td>${detail}</td><td>${badge}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('status-wrap').innerHTML=h;
+}
+
+function buildPersonAgg(period,filter){
+  const map={};
+  allWork.forEach(row=>{
+    if(!String(row[4]||'').includes('완료'))return;
+    if(!matchFilter(row,period,filter))return;
+    const name=String(row[3]||'').trim(),task=String(row[2]||'미지정').trim();
+    if(!name)return;
+    const qty=parseInt(row[7])||0,time=parseTime(row);
+    const key=name+'|'+task;
+    if(!map[key])map[key]={name,task,qty:0,time:0,count:0};
+    map[key].qty+=qty;map[key].time+=time;map[key].count++;
+  });
+  return Object.values(map).sort((a,b)=>a.name.localeCompare(b.name)||a.task.localeCompare(b.task));
+}
+
+function buildTaskAgg(period,filter){
+  const raw={};
+  allWork.forEach(row=>{
+    if(!String(row[4]||'').includes('완료'))return;
+    if(!matchFilter(row,period,filter))return;
+    const task=String(row[2]||'미지정').trim(),name=String(row[3]||'').trim();
+    if(!name)return;
+    const d=extractDate(row);if(!d)return;
+    const ds=fmt(d,'yyyy-MM-dd');
+    const qty=parseInt(row[7])||0,time=parseTime(row);
+    if(!raw[task])raw[task]={};
+    if(!raw[task][ds])raw[task][ds]={};
+    if(!raw[task][ds][name])raw[task][ds][name]={qty:0,time:0,count:0};
+    raw[task][ds][name].qty+=qty;raw[task][ds][name].time+=time;raw[task][ds][name].count++;
+  });
+  return Object.entries(raw).map(([task,dates])=>{
+    let tq=0,tt=0,tc=0,tlc=0;const am={};const dmc=[];
+    Object.entries(dates).forEach(([ds,names])=>{
+      let dc=0;
+      Object.entries(names).forEach(([n,e])=>{
+        tq+=e.qty;tt+=e.time;tc+=e.count;am[n]=true;dc++;
+        const rate=laborMap[n]||0;if(rate>0&&e.time>0)tlc+=e.time*rate;
+      });
+      dmc.push(dc);
+    });
+    const um=Object.keys(am).length;
+    const avg=dmc.length?Math.round(dmc.reduce((a,b)=>a+b,0)/dmc.length*10)/10:0;
+    return{task,tq,tt,tc,tlc,um,avg,uph:tq>0&&tt>0?tq/tt:0};
+  }).sort((a,b)=>a.task.localeCompare(b.task));
+}
+
+const COLORS=['#7c6ff7','#34d399','#fbbf24','#60a5fa','#f87171','#a78bfa','#6ee7b7'];
+
+function mkChart(id,labels,datasets){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  charts[id]=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8b90a7',font:{size:11},autoSkip:false,maxRotation:30},grid:{display:false},border:{color:'rgba(255,255,255,0.05)'}},
+        y:{ticks:{color:'#8b90a7',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'},border:{display:false}}
+      }
+    }
+  });
+}
+
+function renderPerson(){
+  const filter=document.getElementById('p-filter').value;
+  const rows=buildPersonAgg(periodPerson,filter);
+  if(!rows.length){
+    document.getElementById('person-tbl-wrap').innerHTML='<div class="empty">해당 기간 데이터가 없습니다</div>';
+    return;
+  }
+  let h=`<table class="tbl"><thead><tr><th>성명</th><th>주요 업무</th><th>완료 물량</th><th>투입 시간</th><th>UPH</th><th>완료 건수</th><th>인건비</th><th>단위당 비용</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const labor=(laborMap[r.name]||0)*r.time;
+    const uc=labor>0&&r.qty>0?Math.round(labor/r.qty):0;
+    h+=`<tr><td>${r.name}</td><td><span class="tag">${r.task}</span></td>
+    <td>${r.qty>0?r.qty+'개':'-'}</td><td>${r.time>0?r.time.toFixed(1)+'시간':'-'}</td>
+    <td>${uph(r.qty,r.time)}</td><td>${r.count}건</td>
+    <td>${won(labor)}</td><td>${uc>0?'₩'+uc.toLocaleString()+'/개':'-'}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('person-tbl-wrap').innerHTML=h;
+
+  const nameAgg={};
+  rows.forEach(r=>{if(!nameAgg[r.name])nameAgg[r.name]={qty:0,time:0};nameAgg[r.name].qty+=r.qty;nameAgg[r.name].time+=r.time;});
+  const names=Object.keys(nameAgg);
+  mkChart('c-person-qty',names,[{data:names.map(n=>nameAgg[n].qty),backgroundColor:names.map((_,i)=>COLORS[i%COLORS.length]+'99'),borderColor:names.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1,borderRadius:4}]);
+  mkChart('c-person-time',names,[{data:names.map(n=>Math.round(nameAgg[n].time*10)/10),backgroundColor:names.map((_,i)=>COLORS[i%COLORS.length]+'99'),borderColor:names.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1,borderRadius:4}]);
+}
+
+function renderTask(){
+  const filter=document.getElementById('t-filter').value;
+  const rows=buildTaskAgg(periodTask,filter);
+  if(!rows.length){
+    document.getElementById('task-tbl-wrap').innerHTML='<div class="empty">해당 기간 데이터가 없습니다</div>';
+    return;
+  }
+  let h=`<table class="tbl"><thead><tr><th>주요 업무</th><th>완료 건수</th><th>참여 인원</th><th>총 완료 물량</th><th>총 투입 시간</th><th>평균 UPH</th><th>총 인건비</th><th>단위당 비용</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const mt=r.avg>0?`일평균 ${r.avg}명 (총 ${r.um}명)`:`${r.um}명`;
+    const uc=r.tlc>0&&r.tq>0?Math.round(r.tlc/r.tq):0;
+    h+=`<tr><td><span class="tag">${r.task}</span></td><td>${r.tc}건</td><td>${mt}</td>
+    <td>${r.tq>0?r.tq+'개':'-'}</td><td>${r.tt>0?r.tt.toFixed(1)+'시간':'-'}</td>
+    <td>${uph(r.tq,r.tt)}</td><td>${won(r.tlc)}</td><td>${uc>0?'₩'+uc.toLocaleString()+'/개':'-'}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('task-tbl-wrap').innerHTML=h;
+
+  mkChart('c-task-qty',rows.map(r=>r.task),[{data:rows.map(r=>r.tq),backgroundColor:rows.map((_,i)=>COLORS[i%COLORS.length]+'99'),borderColor:rows.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1,borderRadius:4}]);
+  mkChart('c-task-uph',rows.map(r=>r.task),[{data:rows.map(r=>Math.round(r.uph*10)/10),backgroundColor:rows.map((_,i)=>COLORS[i%COLORS.length]+'99'),borderColor:rows.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1,borderRadius:4}]);
+}
+
+loadData();
+setInterval(loadData,5*60*1000);
+</script>
+</body>
+</html>
